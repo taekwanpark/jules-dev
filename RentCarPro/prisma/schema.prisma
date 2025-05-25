@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Make sure to set this in your .env file
+}
+
+model User {
+  id             String        @id @default(cuid())
+  name           String
+  email          String        @unique
+  phone          String?       // Optional, as not all users might provide it initially
+  password       String        // Will be hashed
+  role           UserRole      @default(CUSTOMER)
+  license_number String?       @unique // Optional and unique if provided
+  reservations   Reservation[]
+  payments       Payment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Car {
+  id            String        @id @default(cuid())
+  brand         String
+  model         String
+  plate_number  String        @unique
+  status        CarStatus     @default(AVAILABLE)
+  daily_rate    Float
+  image_url     String?       // Optional
+  reservations  Reservation[]
+  maintenances  Maintenance[] // Added relation to Maintenance model
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  user        User              @relation(fields: [userId], references: [id])
+  userId      String
+  car         Car               @relation(fields: [carId], references: [id])
+  carId       String
+  start_date  DateTime
+  end_date    DateTime
+  total_cost  Float
+  status      ReservationStatus @default(PENDING)
+  payment     Payment?          // A reservation can have one payment
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([carId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  reservation   Reservation   @relation(fields: [reservationId], references: [id])
+  reservationId String        @unique // Each payment is for one unique reservation
+  user          User          @relation(fields: [userId], references: [id]) // Keep track of who made the payment
+  userId        String
+  amount        Float
+  method        String?       // e.g., "credit_card", "paypal". Can be more structured later.
+  status        PaymentStatus @default(PENDING) // Status of the payment itself
+  paid_at       DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([reservationId])
+  @@index([userId])
+}
+
+// Enum for User Roles
+enum UserRole {
+  ADMIN
+  STAFF
+  CUSTOMER
+}
+
+// Enum for Car Status
+enum CarStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+}
+
+// Enum for Reservation Status
+enum ReservationStatus {
+  PENDING   // User requested, not yet confirmed by staff/admin
+  APPROVED  // Confirmed, car is booked
+  ACTIVE    // Car is currently rented out
+  RETURNED  // Car has been returned
+  CANCELLED // Reservation was cancelled
+  COMPLETED // Reservation fulfilled and car returned (alternative to RETURNED)
+}
+
+// Enum for Payment Status
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REFUNDED
+}
+
+// Maintenance Model as per your initial detailed request
+model Maintenance {
+  id          String   @id @default(cuid())
+  car         Car      @relation(fields: [carId], references: [id])
+  carId       String
+  date        DateTime
+  description String
+  cost        Float?   // Cost might not always be applicable or known immediately
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([carId])
+}
